@@ -3,31 +3,28 @@ requires = ["flit_core >=3.2,<4"]
 build-backend = "flit_core.buildapi"
 
 [project]
-name = "template_python"
+name = "youtube_history"
 authors = [{name = "Arun Kishore", email = "pypi@rpakishore.co.in"}]
 readme = "README.md"
 license = {file = "LICENSE"}
 classifiers = ["License :: OSI Approved :: MIT License"]
 dynamic = ["version", "description"]
 dependencies = [
-    "pandas",
     "typer[all]",   #cli_app.py
     "icecream",     
     "slack_sdk",    #Slack.py
-    "requests",   #request_package
-    "beautifulsoup4",   #request_package
-    "keyring"   #credentials.py
+    "keyring",   #credentials.py
+    "ak_selenium==0.0.1"
 ]
 
 [project.optional-dependencies]
 test = [
     "pytest",
-    "ipykernel",
-    "pandasgui"
+    "ipykernel"
 ]
 
 [project.urls]
-Home = "https://github.com/rpakishore/Template-Python"
+Home = "https://github.com/rpakishore/Youtube-history"
 
 [project.scripts]
-app="template_python.cli_app:app"
+app="youtube_history.cli_app:app"

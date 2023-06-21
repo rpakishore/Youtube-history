@@ -130,3 +130,5 @@ dmypy.json
 .vscode/settings.json
 WebDriver/chromedriver.exe
 nosync*
+development.ipynb
+development.ipynb
