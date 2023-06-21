@@ -111,6 +111,7 @@ For default use, just the command `app` can be used. use `--help` to see methods
 - [ ] Fully scrub shorts
 - [ ] Add ability to load more history and restart scrubbing
 - [ ] Add `whitelist.txt`
+- [ ] Tests
 
 <!-- FAQ -->
 ## 5. FAQ
