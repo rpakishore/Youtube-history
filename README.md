@@ -57,7 +57,14 @@
 
 Google Chrome Browser (Regular not `dev` or `beta`), with your google account already logged in.
 
-A `.txt` file with the list of keywords for scrubbing. See `scrublist.txt` for example.
+Any combination of the following `.txt` file with the list of keywords for scrubbing. 
+
+| Example filenames| Use |
+| -- | -- |
+| `channel-blacklist.txt` | This will delete videos from channels names in this file | 
+| `channel-whitelist.txt` | This will retain videos from channels names in this file | 
+| `keyword-blacklist.txt` | This will delete videos with matching keywords | 
+| `keyword-whitelist.txt` | This will retain videos with matching keywords | 
 
 ### 2.2. Dependencies
 
@@ -110,7 +117,7 @@ For default use, just the command `app` can be used. use `--help` to see methods
 - [x] Scrub Videos
 - [ ] Fully scrub shorts
 - [ ] Add ability to load more history and restart scrubbing
-- [ ] Add `whitelist.txt`
+- [x] Add `whitelist.txt`
 - [ ] Tests
 
 <!-- FAQ -->

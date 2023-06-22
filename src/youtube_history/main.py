@@ -1,26 +1,85 @@
-from ak_selenium import Chrome
+from ak_selenium import Chrome, By
 import time
 from pathlib import Path
+from selenium.webdriver.remote.webelement import WebElement
+from dataclasses import dataclass
+
+@dataclass
+class Keywords:
+    path: Path
+    items: list[str] = None
+    
+    def __post_init__(self):
+        if self.items is None:
+            self.items = get_keywords(self.path)
+    
+@dataclass
+class VideoInfo:
+    element: WebElement
+    title: str = None
+    channel: str = None
+    description: str = None
+    
+    def __post_init__(self):
+        self.title = self.element.find_element(By.ID, 'title-wrapper').text,
+        if type(self.title) == tuple:
+            self.title = self.title[0]
+        self.title = self.title.strip()
+        self.channel= self.element.find_element(By.ID, 'metadata').find_element(By.ID, 'channel-name').text,
+        if type(self.channel) == tuple:
+            self.channel = self.channel[0]
+        self.channel = self.channel.strip()
+        self.description = self.element.find_element(By.ID, 'description-text').text
+        if type(self.description) == tuple:
+            self.description = self.description[0]
+        self.description = self.description.strip()  
+        
+        
+    @property
+    def text(self) -> str:
+        return f"{self.title} {self.channel} {self.description}".lower()
+    
+    def to_remove(self, 
+                  channelblack: Keywords,
+                  keywordblack: Keywords,
+                  channelwhite: Keywords,
+                  keywordwhite: Keywords) -> bool:
+        if self.channel.casefold() in channelwhite.items or any(keyword in self.text for keyword in keywordwhite.items):
+            return False
+        elif self.channel.casefold() in channelblack.items or any(keyword in self.text for keyword in keywordblack.items):
+            return True
+        else:
+            return False
 
 class Scrubber:
-    def __init__(self, keywords_file: Path=None):
-        self.chrome = Chrome(
-            headless=False,
-            half_screen=True
-            )
+    def __init__(
+        self, 
+        keywords_blacklist: str = Path('keyword-blacklist.txt'), 
+        keywords_whitelist: str = Path('keyword-whitelist.txt'), 
+        channel_blacklist: str = Path('channel-blacklist.txt'), 
+        channel_whitelist: str = Path('channel-whitelist.txt')):
+        
+        self.chrome = Chrome(headless=False,half_screen=True)
         self.driver = self.chrome.init_chrome()
         self.driver.get('https://www.youtube.com/feed/history')
         self.check_login()
-        if not keywords_file:
-            keywords_file = Path('scrublist.txt')
-        self.keywords_file = keywords_file
+        
+        self.keywords_blacklist = Keywords(path=keywords_blacklist)
+        self.keywords_whitelist = Keywords(path=keywords_whitelist)
+        self.channel_blacklist = Keywords(path=channel_blacklist)
+        self.channel_whitelist = Keywords(path=channel_whitelist)
+        
+    def __repr__(self) -> str:
+        return f"Scrubber({self.keywords_blacklist.path.name=}\n \
+            {self.keywords_whitelist.path.name=}\n \
+            {self.channel_blacklist.path.name=}\n \
+            {self.channel_whitelist.path.name=})"
         
     def check_login(self):
         """Check if Account is logged in
         """
         chrome = self.chrome
         driver = self.driver
-        By, _ = chrome.get_By_and_Keys()
 
         if chrome.find_element_by_text(
             elements=driver.find_elements(By.TAG_NAME, 'span'),
@@ -31,34 +90,23 @@ class Scrubber:
                 Open Chrome and log into your google account')
             sys.exit()
 
-    def get_keywords(self) -> list[str]:
-        if not self.keywords_file.exists():
-            with open(self.keywords_file, 'w', encoding='utf-8') as f:
-                f.write()
-            keywords = []
-        else:
-            with open(self.keywords_file, 'r', encoding='utf-8') as f:
-                keywords = f.readlines()
-            keywords = [item.lower().strip() for item in keywords if item.strip()]
-        
-        return keywords
+
     
-    def scrub_videos(self, keywords: list[str]=None) -> None:
-        if not keywords:
-            keywords = self.get_keywords()
-            
-        chrome = self.chrome
+    def scrub_videos(self) -> None:            
         driver = self.driver
-        By, _ = chrome.get_By_and_Keys()
         
         # Get Video Containers
         video_containers = driver.find_elements(By.TAG_NAME, 'ytd-video-renderer')
         for video_container in video_containers:
-            title = video_container.find_element(By.TAG_NAME, 'yt-formatted-string').text
-            print(f"{title}...", end='')
+            video_info = VideoInfo(video_container)
+            print(f"{video_info.title} by {video_info.channel}...", end='')
             # Look for keywords in container text
-            container_text = video_container.text.casefold()
-            if any([keyword in container_text for keyword in keywords]):
+            if video_info.to_remove(
+                channelblack=self.channel_blacklist,
+                keywordblack=self.keywords_blacklist,
+                channelwhite=self.channel_whitelist,
+                keywordwhite=self.keywords_whitelist):
+                
                 # find the dismiss Button
                 buttons = video_container.find_elements(By.TAG_NAME, "button")
                 for button in buttons:
@@ -74,7 +122,6 @@ class Scrubber:
         #Work in Progress
         chrome = self.chrome
         driver = self.driver
-        By, _ = chrome.get_By_and_Keys()
         
         reels_containers = driver.find_elements(By.TAG_NAME, 'ytd-reel-shelf-renderer')
 
@@ -110,14 +157,27 @@ class Scrubber:
         del self.chrome
         self.write_scrublist()
         
-    def write_scrublist(self, keywords: list[str]=None) -> None:
-        if not keywords:
-            keywords = self.get_keywords()
-        # Remove duplicates using set()
-        keywords = list(set(keywords))
+    def write_scrublist(self) -> None:
+        for each in (self.channel_blacklist, self.channel_whitelist, 
+                     self.keywords_blacklist, self.keywords_whitelist):
+            
+            # Remove duplicates using set()
+            keywords = list(set(each.items))
 
-        # Sort the list alphabetically using sorted()
-        keywords = sorted(keywords)
+            # Sort the list alphabetically using sorted()
+            keywords = sorted(keywords)
 
-        with open(self.keywords_file, 'w', encoding='utf-8') as f:
-            f.write('\n'.join(keywords))
+            with open(each.path, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(keywords))
+
+        
+def get_keywords(filepath: Path) -> list[str]:
+    if not filepath.exists():
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write()
+        keywords = []
+    else:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            keywords = f.readlines()
+        keywords = [item.lower().strip() for item in keywords if item.strip()]
+    return keywords
