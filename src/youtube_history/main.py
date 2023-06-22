@@ -21,19 +21,9 @@ class VideoInfo:
     description: str = None
     
     def __post_init__(self):
-        self.title = self.element.find_element(By.ID, 'title-wrapper').text,
-        if type(self.title) == tuple:
-            self.title = self.title[0]
-        self.title = self.title.strip()
-        self.channel= self.element.find_element(By.ID, 'metadata').find_element(By.ID, 'channel-name').text,
-        if type(self.channel) == tuple:
-            self.channel = self.channel[0]
-        self.channel = self.channel.strip()
-        self.description = self.element.find_element(By.ID, 'description-text').text
-        if type(self.description) == tuple:
-            self.description = self.description[0]
-        self.description = self.description.strip()  
-        
+        self.title = self.element.find_element(By.ID, 'title-wrapper').text.strip()
+        self.channel= self.element.find_element(By.ID, 'metadata').find_element(By.ID, 'channel-name').text.strip()
+        self.description = self.element.find_element(By.ID, 'description-text').text.strip()
         
     @property
     def text(self) -> str:
