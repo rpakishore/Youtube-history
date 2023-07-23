@@ -14,7 +14,7 @@ dependencies = [
     "icecream",     
     "slack_sdk",    #Slack.py
     "keyring",   #credentials.py
-    "ak_selenium==0.0.2"
+    "ak_selenium==0.0.4"
 ]
 
 [project.optional-dependencies]
