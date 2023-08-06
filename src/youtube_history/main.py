@@ -2,7 +2,11 @@ from ak_selenium import Chrome, By
 import time
 from pathlib import Path
 from selenium.webdriver.remote.webelement import WebElement
+from selenium.common.exceptions import ElementNotInteractableException
 from dataclasses import dataclass
+from typing import Literal
+from icecream import ic
+ic.disable()
 
 @dataclass
 class Keywords:
@@ -42,6 +46,9 @@ class VideoInfo:
             return False
 
 class Scrubber:
+    removed_shorts = []
+    removed_videos = []
+
     def __init__(
         self, 
         keywords_blacklist: str = Path('keyword-blacklist.txt'), 
@@ -82,20 +89,22 @@ class Scrubber:
 
 
     
-    def scrub_videos(self) -> None:            
+    def scrub_videos(self) -> None:
+        print('Removing Videos: ')            
         driver = self.driver
         
         # Get Video Containers
         video_containers = driver.find_elements(By.TAG_NAME, 'ytd-video-renderer')
         for video_container in video_containers:
             video_info = VideoInfo(video_container)
-            print(f"{video_info.title} by {video_info.channel}...", end='')
+            print(f"\t- {video_info.title} by {video_info.channel}...", end='')
             # Look for keywords in container text
             if video_info.to_remove(
                 channelblack=self.channel_blacklist,
                 keywordblack=self.keywords_blacklist,
                 channelwhite=self.channel_whitelist,
                 keywordwhite=self.keywords_whitelist):
+                
                 
                 # find the dismiss Button
                 buttons = video_container.find_elements(By.TAG_NAME, "button")
@@ -105,46 +114,92 @@ class Scrubber:
                         print('Removed')
                         time.sleep(3)
                         break
+                    
+                self.removed_videos.append(video_info.title)
             else:
                 print('Skipped')
                 
     def scrub_shorts(self) -> None:
+        print('Removing Shorts:')
+        
         #Work in Progress
         chrome = self.chrome
         driver = self.driver
         
-        reels_containers = driver.find_elements(By.TAG_NAME, 'ytd-reel-shelf-renderer')
-
-        for reels_container in reels_containers:
-            try:
-                #For each short
-                for shorts_container in reels_container.find_elements(By.TAG_NAME, 'ytd-reel-item-renderer'):
-                    
-                    if shorts_container.text.strip() == 'All views of this video removed from history':
-                        continue
-                    
-                    print(shorts_container.text)
-                    # Click `Action menu` button
-                    for button in shorts_container.find_elements(By.TAG_NAME, "button"): 
-                        if button.get_attribute('aria-label') == 'Action menu':
-                            if button.is_enabled():
-                                button.click()
-                                time.sleep(2)
-                            break
-                    
-                    # Click Remove from watch history
-                    elements = driver.find_elements(By.TAG_NAME, "ytd-menu-service-item-renderer")
-                    button = chrome.find_element_by_text(elements, 'Remove from watch history')
-
-                    if button:
+        def remove_shorts(shorts_container: WebElement) -> None:
+            """
+            Removes the shorts container passed to the function
+            """
+            for button in shorts_container.find_elements(By.TAG_NAME, "button"): 
+                if button.get_attribute('aria-label') == 'Action menu':
+                    if button.is_enabled():
                         button.click()
                         time.sleep(2)
-            except Exception as e:
-                print(str(e))
-                continue
+                    break
+
+            # Click Remove from watch history
+            elements = driver.find_elements(By.TAG_NAME, "ytd-menu-service-item-renderer")
+            button = chrome.find_element_by_text(elements, 'Remove from watch history')
+
+            if button:
+                button.click()
+                time.sleep(2)
             
+        def press_arrow(shorts_master_container: WebElement, 
+                        direction: Literal['left', 'right']) -> None:
+            direction = direction.lower().strip()
+            _ = (
+                shorts_master_container
+                .find_element(By.ID, f"{direction}-arrow")
+                .find_element(By.TAG_NAME, 'ytd-button-renderer')
+                .click()
+                )
+            time.sleep(1)
+            
+
+        
+        shorts_master_containers = driver.find_elements(By.TAG_NAME, 'yt-horizontal-list-renderer')
+        for _shorts_master_container in shorts_master_containers:
+            # Load all Shorts
+            try:
+                press_arrow(_shorts_master_container, "right")
+                press_arrow(_shorts_master_container, "left")
+            except Exception as e:
+                ic(str(e))
+                
+            shorts_containers = _shorts_master_container.find_elements(By.TAG_NAME, 'ytd-reel-item-renderer')
+            
+            for _shorts_container in shorts_containers:
+                
+                # Confirm shorts can be removed
+                shorts_title = ic(_shorts_container.text.split('\n')[0])
+                if shorts_title.strip() == '':
+                    press_arrow(_shorts_master_container, "right")
+                    shorts_title = ic(_shorts_container.text.split('\n')[0])
+                elif shorts_title == 'All views of this video removed from history':
+                    continue
+                
+                print(f"\t- {shorts_title}...", end='')
+                
+                remove_shorts(_shorts_container)
+                
+                self.removed_shorts.append(shorts_title)
+                print("Removed.")
+
+    def print_summary(self):
+        print("="*50)
+        print("\nSummary:")
+        print(f"A total of {len(self.removed_videos)} videos and {len(self.removed_shorts)} shorts were removed.\n")
+        print('Removed Videos:')
+        for video in self.removed_videos:
+            print(f"\t- {video}")
+        print('\nRemoved Shorts:')
+        for shorts in self.removed_shorts:
+            print(f"\t- {shorts}")
+                
     def __del__(self) -> None:
         del self.chrome
+        self.print_summary()
         self.write_scrublist()
         
     def write_scrublist(self) -> None:
