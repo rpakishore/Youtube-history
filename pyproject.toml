@@ -4,6 +4,7 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "youtube_history"
+requires-python = ">=3.11.0"
 authors = [{name = "Arun Kishore", email = "pypi@rpakishore.co.in"}]
 readme = "README.md"
 license = {file = "LICENSE"}
@@ -14,7 +15,7 @@ dependencies = [
     "icecream",     
     "slack_sdk",    #Slack.py
     "keyring",   #credentials.py
-    "ak_selenium==0.0.4"
+    "ak_selenium==0.1.5"
 ]
 
 [project.optional-dependencies]

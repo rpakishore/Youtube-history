@@ -51,13 +51,13 @@ class Scrubber:
 
     def __init__(
         self, 
-        keywords_blacklist: str = Path('keyword-blacklist.txt'), 
-        keywords_whitelist: str = Path('keyword-whitelist.txt'), 
-        channel_blacklist: str = Path('channel-blacklist.txt'), 
-        channel_whitelist: str = Path('channel-whitelist.txt')):
+        keywords_blacklist: Path = Path('keyword-blacklist.txt'), 
+        keywords_whitelist: Path = Path('keyword-whitelist.txt'), 
+        channel_blacklist: Path = Path('channel-blacklist.txt'), 
+        channel_whitelist: Path = Path('channel-whitelist.txt')):
         
-        self.chrome = Chrome(headless=False,half_screen=True)
-        self.driver = self.chrome.init_chrome()
+        self.chrome = Chrome()
+        self.driver = self.chrome.driver
         self.driver.get('https://www.youtube.com/feed/history')
         self.check_login()
         
@@ -161,27 +161,36 @@ class Scrubber:
         shorts_master_containers = driver.find_elements(By.TAG_NAME, 'yt-horizontal-list-renderer')
         for _shorts_master_container in shorts_master_containers:
             # Load all Shorts
-            try:
-                press_arrow(_shorts_master_container, "right")
-                press_arrow(_shorts_master_container, "left")
-            except Exception as e:
-                ic(str(e))
+            _short_load_try_max = 100
+            for _ in range(_short_load_try_max):
+                try:
+                    press_arrow(_shorts_master_container, "right")
+                except Exception:
+                    break
+            
+            for _ in range(_short_load_try_max):
+                try:
+                    press_arrow(_shorts_master_container, "left")
+                except Exception:
+                        break
+
                 
             shorts_containers = _shorts_master_container.find_elements(By.TAG_NAME, 'ytd-reel-item-renderer')
             
             for _shorts_container in shorts_containers:
                 
                 # Confirm shorts can be removed
-                shorts_title = ic(_shorts_container.text.split('\n')[0])
-                if shorts_title.strip() == '':
-                    press_arrow(_shorts_master_container, "right")
-                    shorts_title = ic(_shorts_container.text.split('\n')[0])
-                elif shorts_title == 'All views of this video removed from history':
+                shorts_title: str = ic(_shorts_container.text.split('\n')[0])
+                if shorts_title.strip() == 'All views of this video removed from history':
                     continue
                 
                 print(f"\t- {shorts_title}...", end='')
                 
-                remove_shorts(_shorts_container)
+                try:
+                    remove_shorts(_shorts_container)
+                except ElementNotInteractableException:
+                    press_arrow(_shorts_master_container, "right")
+                    remove_shorts(_shorts_container)
                 
                 self.removed_shorts.append(shorts_title)
                 print("Removed.")
@@ -204,7 +213,7 @@ class Scrubber:
         
     def write_scrublist(self) -> None:
         for each in (self.channel_blacklist, self.channel_whitelist, 
-                     self.keywords_blacklist, self.keywords_whitelist):
+                        self.keywords_blacklist, self.keywords_whitelist):
             
             # Remove duplicates using set()
             keywords = list(set(each.items))
