@@ -6,6 +6,9 @@ from selenium.common.exceptions import ElementNotInteractableException
 from dataclasses import dataclass
 from typing import Literal
 from icecream import ic
+
+from .logger import log
+from .Gotify import notify
 ic.disable()
 
 @dataclass
@@ -45,6 +48,7 @@ class VideoInfo:
         else:
             return False
 
+
 class Scrubber:
     removed_shorts = []
     removed_videos = []
@@ -55,6 +59,8 @@ class Scrubber:
         keywords_whitelist: Path = Path('keyword-whitelist.txt'), 
         channel_blacklist: Path = Path('channel-blacklist.txt'), 
         channel_whitelist: Path = Path('channel-whitelist.txt')):
+        
+        log.info('Starting Youtube History Cleaner')
         
         self.load_driver()
         self.check_login()
@@ -103,9 +109,13 @@ class Scrubber:
     def load_videos(self) -> None:
         for _ in range(5):
             _elem = self.driver.find_element(By.TAG_NAME, "html")
-            _elem.send_keys(Keys.HOME)
+            _elem.send_keys(Keys.END)
             time.sleep(7)
-                
+            
+        _elem = self.driver.find_element(By.TAG_NAME, "html")
+        _elem.send_keys(Keys.HOME)
+        time.sleep(7)
+        
     def __delete_videos(self) -> None:
         print('Removing Videos: ')    
         driver = self.driver
@@ -133,8 +143,10 @@ class Scrubber:
                         break
                     
                 self.removed_videos.append(video_info.title)
+                log.debug(f'Video: DELETED - {video_info.title} by {video_info.channel}')
             else:
                 print('Skipped')
+                log.debug(f'Video: SKIPPED - {video_info.title} by {video_info.channel}')
                 
     def scrub_shorts(self) -> None:
         print('Removing Shorts:')
@@ -180,18 +192,30 @@ class Scrubber:
             
             self.removed_shorts.append(shorts_title)
             print("Removed.")
+            log.debug(f'Shorts: DELETED - {shorts_title}')
 
+    def __gotify_summary(self):
+        notify(
+            app='HomeServer', title='Youtube History Scrubber', message=f'{len(self.removed_videos)} Videos | {len(self.removed_shorts)} Shorts',priority=1
+        )
+        
     def print_summary(self):
         print("="*50)
         print("\nSummary:")
-        print(f"A total of {len(self.removed_videos)} videos and {len(self.removed_shorts)} shorts were removed.\n")
+        log.info(f'Total Videos Removed: {len(self.removed_videos)}\nTotal Shorts Removed: {len(self.removed_shorts)}')
+        #print(f"A total of {len(self.removed_videos)} videos and {len(self.removed_shorts)} shorts were removed.\n")
         print('Removed Videos:')
         for video in self.removed_videos:
             print(f"\t- {video}")
         print('\nRemoved Shorts:')
         for shorts in self.removed_shorts:
             print(f"\t- {shorts}")
-                
+        
+        try:
+            self.__gotify_summary()
+        except Exception as e:
+            log.critical(f'Error occured when sending summary through Gotify.\n{str(e)}')
+        
     def __del__(self) -> None:
         del self.chrome
         #self.print_summary()
