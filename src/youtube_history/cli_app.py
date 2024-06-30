@@ -30,8 +30,15 @@ def scrub(
         channel_blacklist = channel_blacklist, 
         channel_whitelist = channel_whitelist)
     
-    scrub.scrub_videos()
-    scrub.scrub_shorts()
+    try:
+        scrub.scrub_videos()
+    except Exception as e:
+        print(f'Error occured when scrubbing videos:\n{str(e)}')
+    try:
+        scrub.scrub_shorts()
+    except Exception as e:
+        print(f'Error occured when scrubbing shorts:\n{str(e)}')    
     
+    scrub.print_summary()        
     if close:
         del scrub

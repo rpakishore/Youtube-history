@@ -1,4 +1,4 @@
-from ak_selenium import Chrome, By
+from ak_selenium import Chrome, By, Keys
 import time
 from pathlib import Path
 from selenium.webdriver.remote.webelement import WebElement
@@ -56,15 +56,22 @@ class Scrubber:
         channel_blacklist: Path = Path('channel-blacklist.txt'), 
         channel_whitelist: Path = Path('channel-whitelist.txt')):
         
-        self.chrome = Chrome()
-        self.driver = self.chrome.driver
-        self.driver.get('https://www.youtube.com/feed/history')
+        self.load_driver()
         self.check_login()
         
         self.keywords_blacklist = Keywords(path=keywords_blacklist)
         self.keywords_whitelist = Keywords(path=keywords_whitelist)
         self.channel_blacklist = Keywords(path=channel_blacklist)
         self.channel_whitelist = Keywords(path=channel_whitelist)
+    
+        self.write_scrublist()
+        
+    def load_driver(self) -> None:
+        """Load Chromedriver to class attribute
+        """
+        self.chrome = Chrome()
+        self.driver = self.chrome.driver
+        self.driver.get('https://www.youtube.com/feed/history')
         
     def __repr__(self) -> str:
         return f"Scrubber({self.keywords_blacklist.path.name=}\n \
@@ -90,7 +97,17 @@ class Scrubber:
 
     
     def scrub_videos(self) -> None:
-        print('Removing Videos: ')            
+        self.load_videos()
+        self.__delete_videos()
+
+    def load_videos(self) -> None:
+        for _ in range(5):
+            _elem = self.driver.find_element(By.TAG_NAME, "html")
+            _elem.send_keys(Keys.HOME)
+            time.sleep(7)
+                
+    def __delete_videos(self) -> None:
+        print('Removing Videos: ')    
         driver = self.driver
         
         # Get Video Containers
@@ -121,79 +138,48 @@ class Scrubber:
                 
     def scrub_shorts(self) -> None:
         print('Removing Shorts:')
-        
-        #Work in Progress
-        chrome = self.chrome
         driver = self.driver
-        
-        def remove_shorts(shorts_container: WebElement) -> None:
-            """
-            Removes the shorts container passed to the function
-            """
-            for button in shorts_container.find_elements(By.TAG_NAME, "button"): 
-                if button.get_attribute('aria-label') == 'Action menu':
-                    if button.is_enabled():
-                        button.click()
-                        time.sleep(2)
-                    break
-
-            # Click Remove from watch history
-            elements = driver.find_elements(By.TAG_NAME, "ytd-menu-service-item-renderer")
-            button = chrome.find_element_by_text(elements, 'Remove from watch history')
-
-            if button:
-                button.click()
-                time.sleep(2)
-            
-        def press_arrow(shorts_master_container: WebElement, 
-                        direction: Literal['left', 'right']) -> None:
-            direction = direction.lower().strip()
-            _ = (
-                shorts_master_container
-                .find_element(By.ID, f"{direction}-arrow")
-                .find_element(By.TAG_NAME, 'ytd-button-renderer')
-                .click()
-                )
-            time.sleep(1)
-            
-
-        
         shorts_master_containers = driver.find_elements(By.TAG_NAME, 'yt-horizontal-list-renderer')
         for _shorts_master_container in shorts_master_containers:
-            # Load all Shorts
-            _short_load_try_max = 100
-            for _ in range(_short_load_try_max):
-                try:
-                    press_arrow(_shorts_master_container, "right")
-                except Exception:
-                    break
-            
-            for _ in range(_short_load_try_max):
-                try:
-                    press_arrow(_shorts_master_container, "left")
-                except Exception:
-                        break
+            self.load_all_shorts(shorts_container=_shorts_master_container)
+            self.__delete_shorts_in_container(shorts_master_container=_shorts_master_container)
 
-                
-            shorts_containers = _shorts_master_container.find_elements(By.TAG_NAME, 'ytd-reel-item-renderer')
+    def load_all_shorts(self, shorts_container: WebElement):
+        _short_load_try_max = 100
+        for _ in range(_short_load_try_max):
+            try:
+                press_arrow(shorts_container, "right")
+            except Exception:
+                break
+        
+        for _ in range(_short_load_try_max):
+            try:
+                press_arrow(shorts_container, "left")
+            except Exception:
+                    break
+
+    def __delete_shorts_in_container(self, shorts_master_container: WebElement):
+        """Remove all the shorts from a Container w/ a collection of shorts
+
+        Args:
+            shorts_master_container (WebElement): Container containing a collection of shorts
+        """
+        shorts_containers = shorts_master_container.find_elements(By.TAG_NAME, 'ytd-reel-item-renderer')
+        for _shorts_container in shorts_containers:
+            # Confirm shorts can be removed
+            shorts_title: str = ic(_shorts_container.text.split('\n')[0])
+            if shorts_title.strip() == 'All views of this video removed from history':
+                continue
             
-            for _shorts_container in shorts_containers:
-                
-                # Confirm shorts can be removed
-                shorts_title: str = ic(_shorts_container.text.split('\n')[0])
-                if shorts_title.strip() == 'All views of this video removed from history':
-                    continue
-                
-                print(f"\t- {shorts_title}...", end='')
-                
-                try:
-                    remove_shorts(_shorts_container)
-                except ElementNotInteractableException:
-                    press_arrow(_shorts_master_container, "right")
-                    remove_shorts(_shorts_container)
-                
-                self.removed_shorts.append(shorts_title)
-                print("Removed.")
+            print(f"\t- {shorts_title}...", end='')
+            try:
+                self.__remove_shorts(_shorts_container)
+            except ElementNotInteractableException:
+                press_arrow(shorts_master_container, "right")
+                self.__remove_shorts(_shorts_container)
+            
+            self.removed_shorts.append(shorts_title)
+            print("Removed.")
 
     def print_summary(self):
         print("="*50)
@@ -208,8 +194,8 @@ class Scrubber:
                 
     def __del__(self) -> None:
         del self.chrome
-        self.print_summary()
-        self.write_scrublist()
+        #self.print_summary()
+        #self.write_scrublist()
         
     def write_scrublist(self) -> None:
         for each in (self.channel_blacklist, self.channel_whitelist, 
@@ -223,6 +209,25 @@ class Scrubber:
 
             with open(each.path, 'w', encoding='utf-8') as f:
                 f.write('\n'.join(keywords))
+                
+    def __remove_shorts(self, shorts_container: WebElement) -> None:
+            """
+            Removes the shorts container passed to the function
+            """
+            for button in shorts_container.find_elements(By.TAG_NAME, "button"): 
+                if button.get_attribute('aria-label') == 'Action menu':
+                    if button.is_enabled():
+                        button.click()
+                        time.sleep(2)
+                    break
+
+            # Click Remove from watch history
+            elements = self.driver.find_elements(By.TAG_NAME, "ytd-menu-service-item-renderer")
+            button = self.chrome.find_element_by_text(elements, 'Remove from watch history')
+
+            if button:
+                button.click()
+                time.sleep(2)
 
         
 def get_keywords(filepath: Path) -> list[str]:
@@ -235,3 +240,21 @@ def get_keywords(filepath: Path) -> list[str]:
             keywords = f.readlines()
         keywords = [item.lower().strip() for item in keywords if item.strip()]
     return keywords
+
+def press_arrow(shorts_master_container: WebElement, 
+                direction: Literal['left', 'right']) -> None:
+    """Press Arrow in Shorts Container
+
+    Args:
+        shorts_master_container (WebElement): Shorts Master Container Element
+        direction (Literal["left", "right"]): Direction to click
+    """
+    direction = direction.lower().strip()
+    _ = (
+        shorts_master_container
+        .find_element(By.ID, f"{direction}-arrow")
+        .find_element(By.TAG_NAME, 'ytd-button-renderer')
+        .click()
+        )
+    time.sleep(1)
+    
