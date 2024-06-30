@@ -1,2 +1,5 @@
+dlubal
+etabs
 github
+sap2000
 tutorial

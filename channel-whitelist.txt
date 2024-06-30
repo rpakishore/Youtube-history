@@ -1,7 +1,9 @@
 bloomberg originals
 chris titus tech
+civil engineering globe
 computers and structures, inc.
 craft computing
+diy perks
 jeff geerling
 lastweektonight
 linus tech tips
@@ -15,6 +17,7 @@ techno tim
 technology connections
 techquickie
 the plain bagel
+thiojoe
 thomas frank
 vba a2z
 veritasium
