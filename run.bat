@@ -11,4 +11,3 @@ app
 
 REM Deactivate the virtual environment (optional)
 deactivate
-pause
