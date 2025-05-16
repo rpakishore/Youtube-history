@@ -2,6 +2,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
+import os
 
 from ak_selenium import By, Chrome, Keys
 from icecream import ic
@@ -99,7 +100,12 @@ class Scrubber:
 
     def load_driver(self) -> None:
         """Load Chromedriver to class attribute"""
-        self.chrome = Chrome()
+        if os.name == "nt":
+            self.chrome = Chrome()
+        else:
+            self.chrome = Chrome(
+                chrome_userdata_path="/home/rpakishore/.config/google-chrome/Default"
+            )
         self.driver = self.chrome.driver
         self.driver.get("https://www.youtube.com/feed/history")
 
@@ -117,14 +123,15 @@ class Scrubber:
         if chrome.find_element_by_text(
             elements=driver.find_elements(By.TAG_NAME, "span"), text="Sign in"
         ):
-            import sys
+            # import sys
 
-            del chrome
-            Exception(
-                "Google Account is not logged in. \n\
-                Open Chrome and log into your google account"
-            )
-            sys.exit()
+            # del chrome
+            # Exception(
+            #     "Google Account is not logged in. \n\
+            #     Open Chrome and log into your google account"
+            # )
+            # sys.exit()
+            input("Login and press Enter to continue")
 
     def scrub_videos(self) -> None:
         self.load_videos()
