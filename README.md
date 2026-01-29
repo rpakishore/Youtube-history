@@ -1,4 +1,6 @@
 <!--- Heading --->
+
+**REPLACED WITH [https://gist.github.com/rpakishore/8ca8d38b8f5c920b2b8a74842ca1b057](https://gist.github.com/rpakishore/8ca8d38b8f5c920b2b8a74842ca1b057)**
 <div align="center">
   <img src="assets/banner.png" alt="banner" width="auto" height="auto" />
   <h1>Youtube Scrubber</h1>
